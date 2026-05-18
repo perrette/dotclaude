@@ -62,7 +62,7 @@ Every item MUST follow this structure:
 ### Item N: <imperative title>
 
 **Model**: <sonnet | opus | haiku>      (optional; default sonnet)
-**Effort**: <low | medium | high | xhigh | max>   (optional; default medium)
+**Effort**: <medium | high | xhigh | max>   (optional; default medium)
 **Subagents**: parallel                  (optional; omit for serial in-agent execution)
 **Subagent targets**:                    (required if Subagents is set)
 - target 1 (one short line)
