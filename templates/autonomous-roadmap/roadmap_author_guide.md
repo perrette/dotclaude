@@ -155,3 +155,35 @@ Order items so each commit leaves the project in a working state, roughly:
 - Do not include documentation update items unless the user asked.
 - Do not include cleanup items for cosmetic things (renaming variables for
   taste, adding type hints, etc.) unless the user asked.
+
+## Final pass before presenting the draft
+
+Once the items are written, do one focused re-read against the bump
+rubric in *Item structure* above. The default sonnet/medium profile is
+the path of least resistance, and items that warrant `opus`/`high` are
+easy to miss on the first pass.
+
+For **each** item, ask:
+
+1. Does this item integrate an unfamiliar third-party library API — i.e.
+   the agent has to read and reason about external code structure
+   (response shapes, callback signatures, undocumented fields)?
+2. Does this item require nontrivial architectural judgment — designing
+   the *shape* of a new abstraction, not just moving code into a shape
+   that's already decided?
+3. Does this item have cross-cutting effects where a wrong call cascades
+   through many files?
+
+If the answer to any is "yes", set `**Model**: opus` and
+`**Effort**: high` (or higher) on the item. If the answer is "no" for
+all three, defaults are fine — but if an item *looks like* it might
+qualify and you decided against bumping it, surface that decision when
+presenting the draft (e.g. "Item N touches the X SDK but I kept it at
+sonnet/medium because the call pattern is already established in
+adjacent code — flag if you disagree"). Making the judgment explicit
+gives the user a chance to challenge it before the loop runs against
+the wrong model.
+
+This pass is cheap (one re-read) and the failure mode it prevents
+(sonnet attempting an item it cannot handle, producing a half-working
+commit that the next iteration must work around) is expensive.
