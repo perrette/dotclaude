@@ -1,0 +1,2 @@
+# Autonomous roadmap workflows (local coordination artifacts; never committed)
+workflows/
