@@ -40,7 +40,11 @@ them in its commit.
   `progress.md`.
 - If no pending items remain (all completed), append `STATUS: COMPLETE` as
   the final line of `progress.md` (nothing after it) and exit without
-  committing.
+  committing. (Normally the agent that completes the last item also
+  appends this line in §5, so the loop terminates without a no-op
+  iteration; this branch is the fallback for when that didn't happen —
+  e.g. a previous iteration was interrupted between its commit and the
+  final append.)
 
 ### 3. Sanity-check before acting
 
@@ -117,6 +121,15 @@ Commit with a short imperative-mood message describing the item, e.g.:
 
 Use a plain commit message — no `Co-Authored-By:` trailer, no
 "Generated with Claude Code" line, no attribution footer of any kind.
+
+**Final-item shortcut.** If, after this commit, every item in
+`roadmap.md` is now marked `Status: completed` in `progress.md` — i.e.
+this was the last pending item — *also* append `STATUS: COMPLETE` as a
+final line of `progress.md` (nothing after it). This lets the loop
+driver terminate immediately on its next read instead of spawning one
+more agent whose only job is to write that line. Do this *after* the
+commit succeeds, never before: if the commit fails or you crash between
+steps, the §2 fallback handles it on the next iteration.
 
 Then proceed to §7 (write the hint file) before exiting.
 
