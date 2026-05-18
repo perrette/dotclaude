@@ -55,11 +55,25 @@ Perform these actions:
 1. Create `workflows/<slug>/` in the project root.
 2. Write the approved roadmap content to `workflows/<slug>/roadmap.md`.
 3. Create an empty `workflows/<slug>/progress.md`.
-4. Append `~/.claude/templates/autonomous-roadmap/gitignore_snippet.txt`
+4. Write `workflows/<slug>/next_run.env` with Item 1's model and effort
+   hints. Read the `**Model**:` and `**Effort**:` lines from Item 1 of
+   the roadmap (if present) and write them as two lines:
+   ```
+   MODEL=<value>
+   EFFORT=<value>
+   ```
+   This is required because the runner reads `next_run.env` at the start
+   of every iteration, and the executing agent only writes it at the END
+   of each iteration (looking ahead to the next pending item). Without
+   seeding it here, the first iteration always falls back to the runner
+   default (sonnet/medium) — Item 1's hints would never take effect, even
+   if it is labelled opus/high. If Item 1 has no model/effort hints in
+   the roadmap, skip this step (the runner defaults apply).
+5. Append `~/.claude/templates/autonomous-roadmap/gitignore_snippet.txt`
    to `.gitignore` at the project root, but only if `workflows/` is not
    already gitignored (check first to avoid duplicate lines). Create
    `.gitignore` if it doesn't exist.
-5. Report back to the user with:
+6. Report back to the user with:
    - The path of the workflow directory.
    - The exact command to run a single sanity-check iteration:
      ```
