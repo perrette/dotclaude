@@ -141,11 +141,35 @@ system deliberately has no worktree/merge machinery: disjointness is
 the contract. The executing agent will halt via STOP.md if it finds
 itself wanting to merge overlapping edits between subagents.
 
-The cost trade is paying N subagent system prompts (~N× tokens) to get
-~1/N wall-clock time. Worth it when items genuinely fan out, wasteful
-otherwise — and the single item-level commit means you lose nothing on
-bisectability either way. If you wanted per-target commits, you wanted
-N separate items.
+**Sizing fan-out items.** The standard sizing rubric below (1-3 files,
+50-300 lines, "atomic commit") measures *cognitive density*, not raw
+size. For fan-out items, apply it *per target* rather than to the item
+as a whole — a 4-target item legitimately covers 4 files and 400-800
+lines, because each subagent only sees its own target and the reviewer
+reads four independent diffs of normal size in one commit. The "one
+conceptual change" rule still holds (the concept is "apply this
+transformation to each target"). Do not pre-emptively split a fan-out
+item back into N sequential items just to satisfy the per-item line
+count — that defeats the point. Conversely, if a fan-out item's
+*per-target* work would itself violate the rubric (e.g. each target is
+its own 500-line refactor), that's a sign the targets aren't
+homogeneous enough for one item, and you should split anyway.
+
+**When the overhead doesn't pay off.** Each subagent pays roughly 10K
+tokens of setup (system prompt, roadmap read, target file read) before
+doing any meaningful work. If the per-target work itself is light —
+under ~50 lines of edits — the overhead dominates: you pay ~N× the
+tokens for ~N× the wall-clock saving, which is a fair trade in time
+but a poor one in cost. For light fan-out, sequence the targets within
+a single agent (omit the `Subagents` declaration) instead. The
+parallel-subagents declaration is meant for *heavy* fan-out where each
+target is substantive enough that the per-subagent setup is amortized
+over real work.
+
+The cost trade in the heavy case is paying ~N× tokens to get ~1/N
+wall-clock time, with a single item-level commit covering all results.
+You lose nothing on bisectability — if you wanted per-target commits,
+you wanted N separate items.
 
 ## Sizing rubric
 
