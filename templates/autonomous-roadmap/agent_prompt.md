@@ -67,7 +67,16 @@ If any of these fail, take the safety brake. Do not improvise.
 - Do not add tests unless the item explicitly asks.
 - Do not modify `roadmap.md`.
 - Do not introduce new dependencies beyond what the item lists.
-- Do not spawn subagents — you are the only agent for this item.
+- Do not spawn subagents *unless* the item's metadata declares
+  `**Subagents**: parallel` with an explicit `**Subagent targets**` list.
+  When permitted: dispatch one subagent per listed target in parallel,
+  wait for all to return, then run the item's Verification yourself on
+  the combined result, and make a single item-level commit covering all
+  the changes. No nested subagents (a dispatched subagent must not
+  itself spawn further subagents). No worktrees — disjointness of
+  targets is the contract. If you find yourself wanting to merge
+  overlapping edits between subagents, abort via STOP.md instead of
+  trying to resolve it.
 
 Verify the changes:
 
@@ -212,7 +221,8 @@ Then exit.
 ## Hard rules summary
 
 - One item per invocation. No more, no less.
-- No subagents.
+- No subagents unless the item explicitly opts in via
+  `**Subagents**: parallel` with disjoint targets (see §4).
 - No `Co-Authored-By:` trailers or attribution footers in commits.
 - No commits when halting via STOP.md.
 - `progress.md` is appended to every iteration, success or halt.

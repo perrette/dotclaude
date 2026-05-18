@@ -63,6 +63,10 @@ Every item MUST follow this structure:
 
 **Model**: <sonnet | opus | haiku>      (optional; default sonnet)
 **Effort**: <low | medium | high | xhigh | max>   (optional; default medium)
+**Subagents**: parallel                  (optional; omit for serial in-agent execution)
+**Subagent targets**:                    (required if Subagents is set)
+- target 1 (one short line)
+- target 2
 
 **Scope**: one-line summary of what changes.
 
@@ -104,6 +108,44 @@ at agent *launch*, not mid-session.
 - Pure extractions / renames / moves with tight acceptance criteria.
 - Registering a new entry in an existing registry.
 - Filename/regex tweaks.
+
+**Parallel subagents (optional, advanced):**
+
+When an item is genuinely homogeneous fan-out across files (or
+disjoint regions of files) that don't share editable surface — e.g.
+"apply this metadata override across each of N backend modules" — you
+may declare it parallelizable:
+
+```
+**Subagents**: parallel
+**Subagent targets**:
+- bard/backends/openai.py — add list_voices_meta() per item N
+- bard/backends/kokoro.py — add list_voices_meta() per item N
+- bard/backends/piper.py — add list_voices_meta() per item N
+- bard/backends/elevenlabs.py — add list_voices_meta() per item N
+```
+
+The executing agent will dispatch one subagent per target in parallel,
+collect all results, run the item's Verification once on the combined
+result, and make a single item-level commit. Use this *only* when:
+
+- Each target is independent of the others.
+- Each target operates on files (or non-overlapping regions of files)
+  that the others do not touch.
+- Sequencing between targets does not matter.
+- The work is regular enough that a single Acceptance criteria block
+  applies uniformly to every target.
+
+If any of those don't hold, split into separate items instead. The
+system deliberately has no worktree/merge machinery: disjointness is
+the contract. The executing agent will halt via STOP.md if it finds
+itself wanting to merge overlapping edits between subagents.
+
+The cost trade is paying N subagent system prompts (~N× tokens) to get
+~1/N wall-clock time. Worth it when items genuinely fan out, wasteful
+otherwise — and the single item-level commit means you lose nothing on
+bisectability either way. If you wanted per-target commits, you wanted
+N separate items.
 
 ## Sizing rubric
 
