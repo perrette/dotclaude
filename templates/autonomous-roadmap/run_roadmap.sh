@@ -161,6 +161,43 @@ for i in $(seq "$START" "$END"); do
     if tail -n 1 "$PROGRESS" 2>/dev/null | grep -q '^STATUS: COMPLETE'; then
         echo
         echo "Roadmap complete after iteration $i."
+
+        # Post-completion cleanup: if this workflow was materialized in a
+        # git worktree (worktree.env present), remove the worktree and
+        # delete the autonomous branch now that the merge commit is in
+        # the main checkout. cd to MAIN_REPO first — once `git worktree
+        # remove` runs, this script's previous cwd (the worktree) is
+        # gone.
+        WORKTREE_ENV="$WORKFLOW_DIR/worktree.env"
+        if [[ -f "$WORKTREE_ENV" ]]; then
+            CLEANUP_MAIN=$(hint_get MAIN_REPO          "$WORKTREE_ENV" "")
+            CLEANUP_PATH=$(hint_get WORKTREE_PATH      "$WORKTREE_ENV" "")
+            CLEANUP_BRANCH=$(hint_get AUTONOMOUS_BRANCH "$WORKTREE_ENV" "")
+            CLEANUP_SLUG=$(hint_get SLUG               "$WORKTREE_ENV" "$(basename "$WORKFLOW_DIR")")
+
+            if [[ -n "$CLEANUP_MAIN" && -n "$CLEANUP_PATH" && -n "$CLEANUP_BRANCH" ]]; then
+                printf '\n[cleanup] Removing worktree and deleting branch...\n'
+                if cd "$CLEANUP_MAIN" 2>/dev/null; then
+                    if git worktree remove --force "$CLEANUP_PATH"; then
+                        printf '[cleanup] Removed worktree: %s\n' "$CLEANUP_PATH"
+                    else
+                        printf '[cleanup] Warning: could not remove worktree %s — clean up manually.\n' \
+                            "$CLEANUP_PATH" >&2
+                    fi
+                    if git branch -d "$CLEANUP_BRANCH" 2>/dev/null; then
+                        printf '[cleanup] Deleted branch: %s\n' "$CLEANUP_BRANCH"
+                    else
+                        printf '[cleanup] Warning: could not delete branch %s — verify it is merged, then delete manually.\n' \
+                            "$CLEANUP_BRANCH" >&2
+                    fi
+                    printf '\n[cleanup] Roadmap "%s" complete and merged into base branch.\n' "$CLEANUP_SLUG"
+                else
+                    printf '[cleanup] Warning: could not cd to MAIN_REPO=%s; skipping cleanup.\n' \
+                        "$CLEANUP_MAIN" >&2
+                fi
+            fi
+        fi
+
         exit 0
     fi
 done

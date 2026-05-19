@@ -171,6 +171,116 @@ wall-clock time, with a single item-level commit covering all results.
 You lose nothing on bisectability — if you wanted per-target commits,
 you wanted N separate items.
 
+## Required trailing items
+
+Every roadmap MUST end with exactly two items: a finalization item and a
+merge item, in that order. They are part of the standard scaffold — not
+project-specific — and the executor relies on their presence. Do not
+skip them, do not reorder them, and do not fold them into the last
+substantive item.
+
+### Trailing Item N-1: Finalization (README, docs, full tests)
+
+This item refreshes user-facing artifacts that drifted during the
+roadmap, and runs the project's full test suite once (not just the
+per-item smoke tests). It is the last opportunity to catch regressions
+that smoke tests don't cover, and to keep documentation in lockstep with
+the code.
+
+Template:
+
+```markdown
+### Item N-1: Finalize documentation and run full test suite
+
+**Model**: sonnet
+**Effort**: medium
+
+**Scope**: Refresh README and project docs to reflect the new state
+produced by Items 1..N-2, and run the full test suite to confirm the
+roadmap as a whole leaves the project healthy.
+
+**Files affected**:
+- README.md (modify)
+- <other docs files, e.g. docs/architecture.md> (modify)
+- <test fixture files only if a doc/code drift exposed an out-of-date fixture> (modify)
+
+**Acceptance criteria**:
+- README accurately describes the new state — old commands, examples,
+  and architecture diagrams referencing the pre-roadmap shape are
+  updated or removed.
+- Project docs under <docs path, if any> reflect the new interfaces,
+  flags, or architecture. No item in this roadmap is silently
+  undocumented at user-visible surface.
+- The full test suite passes: <project's full test command>.
+- No code changes outside the documented files (this item is for docs
+  + verification, not for fixing newly-discovered bugs — those go in a
+  separate item before this one).
+
+**Verification**:
+- <full test suite command, e.g. `.venv/bin/pytest` or `npm test`>
+- <quick doc lint if the project has one, e.g. `mdl README.md`; optional>
+
+**Dependencies**: Items 1..N-2.
+```
+
+Adjust for project specifics:
+
+- If the project has **no test suite**, replace the test verification
+  line with `# project has no test suite — skip` and note this in the
+  Scope, so the agent doesn't halt looking for one.
+- If the project has **no docs beyond README**, omit `docs/` from
+  Files affected; keep README.
+- If documentation lives in a wiki or external system rather than the
+  repo, note that in Scope so the agent doesn't go hunting for files
+  that don't exist; the test-suite run still applies.
+
+This item is `sonnet`/`medium` by default — it's mechanical refresh
+work, not architectural reasoning. Bump only if the docs themselves
+need significant redesign (rare; that should be its own earlier item).
+
+### Trailing Item N: Merge `autonomous/<slug>` into `<base>` and clean up
+
+This is the only item that operates on the *main checkout* rather than
+the worktree. The executor recognizes it by the literal `**Type**:
+merge-and-cleanup` metadata line and follows a special branch of the
+agent prompt — do not omit that field.
+
+Template:
+
+```markdown
+### Item N: Merge `autonomous/<slug>` into `<base>` and finish
+
+**Type**: merge-and-cleanup
+**Model**: sonnet
+**Effort**: medium
+
+**Scope**: Merge the autonomous branch back into the base branch with
+`--no-ff`, append `STATUS: COMPLETE` to progress.md, and exit. The
+loop driver removes the worktree and deletes the branch afterward.
+
+**Files affected**:
+- (none — this item performs a git merge, no file edits)
+
+**Acceptance criteria**:
+- The base branch fast-forwards or `--no-ff` merges the autonomous
+  branch cleanly (no conflicts, no manual resolution).
+- The main checkout's working tree is clean before the merge and
+  remains clean after (no stray uncommitted files introduced by the
+  merge).
+- progress.md gains a `## Item N` block marked completed, followed by
+  a final `STATUS: COMPLETE` line.
+
+**Verification**:
+- (the agent's merge-and-cleanup branch in the prompt handles
+  verification; no Verification commands required here)
+
+**Dependencies**: Item N-1 (and transitively all prior items).
+```
+
+The slug, base branch, and main-checkout path are read from
+`worktree.env` in the workflow dir, written at materialization time —
+the agent does not infer them.
+
 ## Sizing rubric
 
 Each item should be approximately:
@@ -211,6 +321,11 @@ Order items so each commit leaves the project in a working state, roughly:
 4. **Generalize** — handle previously-hardcoded special cases.
 5. **Add new instances** — new backends / plugins / etc.
 6. **UX polish** — surface the new capabilities to users.
+7. **Finalization** (Item N-1) — README, docs, full test suite. See
+   *Required trailing items* above.
+8. **Merge + cleanup** (Item N) — `--no-ff` merge into base, runner
+   removes the worktree and deletes the branch. See *Required trailing
+   items* above.
 
 ## What to leave out
 

@@ -45,6 +45,11 @@ them in its commit.
   iteration; this branch is the fallback for when that didn't happen —
   e.g. a previous iteration was interrupted between its commit and the
   final append.)
+- **If the next pending item has `**Type**: merge-and-cleanup` in its
+  metadata** (this is always the last item of any roadmap; see the
+  author guide), skip §3–§5 and go directly to §M below. That path
+  performs a git merge in the *main checkout*, not a normal code-edit
+  + commit cycle in the worktree.
 
 ### 3. Sanity-check before acting
 
@@ -142,6 +147,97 @@ steps, the §2 fallback handles it on the next iteration.
 
 Then proceed to §7 (write the hint file) before exiting.
 
+### M. Merge-and-cleanup item — final-item special path
+
+Follow this section *only* if §2 directed you here (i.e. the next pending
+item's metadata includes `**Type**: merge-and-cleanup`). This path
+replaces §3–§5. It performs a git merge from the *main checkout*, not
+from inside the worktree, and the loop driver — not this agent — handles
+worktree removal and branch deletion afterward.
+
+Read `{{WORKFLOW_DIR}}/worktree.env`. It must contain:
+
+- `MAIN_REPO` — absolute path of the main checkout (project root).
+- `WORKTREE_PATH` — absolute path of the worktree (your cwd).
+- `BASE_BRANCH` — branch to merge into.
+- `AUTONOMOUS_BRANCH` — branch to merge from (the one this worktree is on).
+- `SLUG` — short workflow name.
+
+If this file is missing or any field is empty, take the safety brake
+(§6). The workflow was materialized incorrectly and improvising would
+risk leaving the repo in a half-merged state.
+
+#### M.1 Verify both checkouts are clean
+
+- `git status --porcelain` in the worktree (your cwd) MUST be empty.
+  If not, earlier items left uncommitted changes — take the safety
+  brake; do not stash or auto-commit.
+- `git -C "$MAIN_REPO" status --porcelain` MUST be empty. If not,
+  there is unrelated user work in the main checkout — take the safety
+  brake; do not touch it.
+
+#### M.2 Verify the autonomous branch is ahead of base
+
+Run:
+
+```
+git -C "$MAIN_REPO" rev-list --left-right --count "$BASE_BRANCH"..."$AUTONOMOUS_BRANCH"
+```
+
+The right number (commits on the autonomous branch not yet in base)
+must be ≥ 1. If it is 0, the branches have not diverged — take the
+safety brake. (Left number > 0 is fine: base advanced since the
+worktree was cut; the `--no-ff` merge handles that.)
+
+#### M.3 Perform the merge in the main checkout
+
+```
+git -C "$MAIN_REPO" checkout "$BASE_BRANCH"
+git -C "$MAIN_REPO" merge --no-ff "$AUTONOMOUS_BRANCH" \
+    -m "Merge autonomous roadmap: $SLUG"
+```
+
+Use a plain merge-commit message — no `Co-Authored-By:` trailer, no
+"Generated with Claude Code" footer.
+
+If the merge fails (conflict, refused fast-forward, etc.), run
+`git -C "$MAIN_REPO" merge --abort` and take the safety brake. Do not
+attempt automated conflict resolution — leave it to a human.
+
+#### M.4 Append completion + terminator to progress.md
+
+Append to `{{WORKFLOW_DIR}}/progress.md`:
+
+```
+## Item N: <merge item title from roadmap>
+- Status: completed
+- Date: <YYYY-MM-DD>
+- Notes: Merged $AUTONOMOUS_BRANCH into $BASE_BRANCH with --no-ff
+  (merge commit in main checkout).
+
+STATUS: COMPLETE
+```
+
+The bare `STATUS: COMPLETE` on its own line is the loop driver's exit
+signal. Do NOT make any commit on the autonomous branch for this item;
+the work product is the merge commit in main, not a worktree commit.
+
+#### M.5 Clear the next-run hint
+
+Delete `{{WORKFLOW_DIR}}/next_run.env` if it exists. The roadmap is
+complete; there is no next iteration to hint for.
+
+#### M.6 Exit — do NOT remove the worktree yourself
+
+Do NOT run `git worktree remove`. Do NOT run `git branch -d`. Do NOT
+delete the worktree directory. The loop driver removes the worktree
+and deletes the branch after it reads `STATUS: COMPLETE`. Removing
+the worktree from inside it leaves the driver's cwd in a deleted
+path, which breaks the cleanup.
+
+Then exit. Do not proceed to §7 — the runner does not need a hint
+file after STATUS: COMPLETE.
+
 ### 6. Safety brake — STOP.md
 
 Write `{{WORKFLOW_DIR}}/STOP.md` and exit *without committing* when:
@@ -223,9 +319,14 @@ Then exit.
 - One item per invocation. No more, no less.
 - No subagents unless the item explicitly opts in via
   `**Subagents**: parallel` with disjoint targets (see §4).
-- No `Co-Authored-By:` trailers or attribution footers in commits.
+- No `Co-Authored-By:` trailers or attribution footers in commits or
+  merge-commit messages.
 - No commits when halting via STOP.md.
 - `progress.md` is appended to every iteration, success or halt.
 - `roadmap.md` is read-only.
 - Coordination files (everything under `{{WORKFLOW_DIR}}`) are gitignored — never stage them.
 - Pre-existing dirty working-tree files are off-limits to this iteration.
+- The merge-and-cleanup item (§M) is the *only* item that operates on
+  the main checkout. It produces a merge commit there but makes no
+  commit on the autonomous branch. The loop driver — not this agent —
+  removes the worktree and deletes the branch afterward.
